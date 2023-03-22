@@ -1,12 +1,10 @@
 #include <FEHLCD.h>
 #include <FEHIO.h>
 #include <FEHUtility.h>
-#include <FEHMotor.h>
 #include <FEHRPS.h>
-#include <FEHServo.h>
-#include <FEHBattery.h>
 #include <string>
 #include "Motor.h"
+#include "Servo.h"
 #include <cmath>
 
 using namespace std;
@@ -23,6 +21,8 @@ AnalogInputPin cdsCell(FEHIO::P3_7);
 
 Motor rightMotor(FEHMotor::Motor3, 9.0, distancePerCount, FEHIO::P0_0);
 Motor leftMotor(FEHMotor::Motor0, 9.0, distancePerCount, FEHIO::P0_7);
+
+Servo spatula(FEHServo::Servo0, 703, 2339);
 
 enum Direction {
     CW,
@@ -194,7 +194,7 @@ int main() {
 
     float x, y;
 
-    //RPS.InitializeTouchMenu();
+    RPS.InitializeTouchMenu();
 
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
@@ -203,66 +203,36 @@ int main() {
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
-    //LCD.WriteLine(moveAround(speed/2));
+    int correctLever = RPS.GetCorrectLever();
 
-    // turn(180, speed);
-    // Sleep(5.0);
-    // turn(-180, speed);
-
-    while (getLightColor() == BLACK);
-
-    turn(2, speed);
-    Sleep(sleepTime);
-
-    drive(35, speed);
-    Sleep(sleepTime);
-
-    turn(-34, speed);
-    Sleep(sleepTime);
-
-    drive(25, speed);
-    Sleep(sleepTime);
-
-    // int color = getLightColor();
-    // Sleep(sleepTime);
-
-    int color = moveAround(4);
-
-    if (color == RED) {
-        LCD.WriteLine("Light Color: RED");
-        drive(-14, speed);
-    } else {
-        LCD.WriteLine("Light Color: BLUE");
-        drive(-8, speed);
-    }
-
-    turn(38, speed);
-    Sleep(sleepTime);
-
-    driveForwardUntilStopped();
-
-    drive(-18, speed);
+    drive(10, speed);
     Sleep(sleepTime);
 
     turn(-90, speed);
     Sleep(sleepTime);
 
-    if (color == RED) {
-        drive(-7.5, speed);
-    } else {
-        drive(-13.5, speed);
+    int forwardDistance = 14;
+
+    if (correctLever == 1) {
+        forwardDistance += 3.5;
+    } else if (correctLever == 2) {
+        forwardDistance += 7;
     }
 
-    turn(90, speed);
+    drive(forwardDistance, speed);
     Sleep(sleepTime);
 
-    drive(-25, speed);
+    turn(-90, speed);
     Sleep(sleepTime);
 
-    // while (true) {
-    //     LCD.WriteLine(cdsCell.Value());
-    //     Sleep(0.5);
-    // }
+    drive(-3, speed);
+    Sleep(sleepTime);
+
+    spatula.moveToDegree(110, 3);
+
+    Sleep(5.0);
+
+    spatula.moveToDegree(0, 3);
 
     return 0;
 }
