@@ -3,6 +3,8 @@
 #include <FEHUtility.h>
 #include <FEHMotor.h>
 #include <FEHRPS.h>
+#include <FEHServo.h>
+#include <FEHBattery.h>
 #include <string>
 #include "Motor.h"
 #include <cmath>
@@ -10,14 +12,22 @@
 using namespace std;
 
 const double distancePerCount = 6.0/242;
-const double adjustmentFactor = 1.03;
+//const double adjustmentFactor = 1.03;
 const double distanceBetweenWheels = 7.25;
-const double distanceComp = 0.97;
+const double turnComp = 0.98;
+const int pulsePercent = 15;
+const double pulseTime = 0.1;
+const double pi = 3.14159;
 
 AnalogInputPin cdsCell(FEHIO::P3_7);
 
 Motor rightMotor(FEHMotor::Motor3, 9.0, distancePerCount, FEHIO::P0_0);
 Motor leftMotor(FEHMotor::Motor0, 9.0, distancePerCount, FEHIO::P0_7);
+
+enum Direction {
+    CW,
+    CCW
+};
 
 void move(double rightDistance, double leftDistance, double time) {
 
@@ -53,7 +63,7 @@ void drive(double distance, double speed) {
 }
 
 void turn(int degrees, double speed) {
-    double distance = (3.14159 * distanceBetweenWheels) * (degrees / 360.0);
+    double distance = (pi * distanceBetweenWheels) * (degrees / 360.0);
     move(-1 * distance, distance, distance/speed);
     string message = "Turned " + to_string(degrees) + " degrees";
     LCD.WriteLine(message.c_str());
@@ -61,15 +71,118 @@ void turn(int degrees, double speed) {
 
 int getLightColor() {
     double reading = cdsCell.Value();
-    LCD.WriteLine(reading);
-    if (reading < 0.4) {
-        LCD.WriteLine("Light Color: RED");
+    //LCD.WriteLine(reading);
+    if (reading < 0.55) {
+        //LCD.WriteLine("Light Color: RED");
         return RED;
-    } else if (reading < 1) {
-        LCD.WriteLine("Light Color: BLUE");
+    } else if (reading < 2) {
+        //LCD.WriteLine("Light Color: BLUE");
         return BLUE;
     } else {
-        LCD.WriteLine("Light Color: NONE");
+        //LCD.WriteLine("Light Color: NONE");
+        return BLACK;
+    }
+}
+
+void pulseTurn(Direction d) {
+    rightMotor.setPercent(pulsePercent * (d == CCW));
+    leftMotor.setPercent(pulsePercent * (d == CW));
+    Sleep(pulseTime);
+    rightMotor.stop();
+    leftMotor.stop();
+}
+
+void correctHeading(int degrees, Direction d) {
+    while(RPS.Heading() < degrees - 1 || RPS.Heading() > degrees + 1) {
+        pulseTurn(d);
+        while (RPS.Heading() < 0);
+    }
+}
+
+void correctHeading(double x, double y, Direction d) {
+    while (RPS.Heading() < 0);
+    double deltaX = x - RPS.X(), deltaY = y - RPS.Y();
+    correctHeading(270 + atan(deltaY/deltaX) * (180 / pi), d);
+}
+
+void driveForwardUntilStopped() {
+    rightMotor.setPercent(25);
+    leftMotor.setPercent(25);
+    int lastCounts = 0;
+    Sleep(0.25);
+    while (rightMotor.counts() - lastCounts > 10) {
+        lastCounts = rightMotor.counts();
+        Sleep(0.25);
+    }
+}
+
+double checkAndSleep(double minimum) {
+    Sleep(0.5);
+    if (cdsCell.Value() < minimum) {
+        return cdsCell.Value();
+    } else {
+        return minimum;
+    }
+}
+
+int moveAround(double speed) {
+    double minimum = 3.3;
+
+    double distance = 0.5;
+
+    drive(-1 * distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(-1 * distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    turn(10, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(-1 * distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(-1 * distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    turn(-20, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(-1 * distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(-1 * distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    turn(10, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    drive(distance, speed);
+    minimum = checkAndSleep(minimum);
+
+    if (minimum < 0.55) {
+        //LCD.WriteLine("Light Color: RED");
+        return RED;
+    } else if (minimum < 2) {
+        //LCD.WriteLine("Light Color: BLUE");
+        return BLUE;
+    } else {
+        //LCD.WriteLine("Light Color: NONE");
         return BLACK;
     }
 }
@@ -81,6 +194,8 @@ int main() {
 
     float x, y;
 
+    //RPS.InitializeTouchMenu();
+
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
 
@@ -88,43 +203,43 @@ int main() {
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
+    //LCD.WriteLine(moveAround(speed/2));
+
+    // turn(180, speed);
+    // Sleep(5.0);
+    // turn(-180, speed);
+
     while (getLightColor() == BLACK);
 
     turn(2, speed);
     Sleep(sleepTime);
 
-    drive(34.5, speed);
+    drive(35, speed);
     Sleep(sleepTime);
 
-    turn(-40, speed);
+    turn(-34, speed);
     Sleep(sleepTime);
 
     drive(25, speed);
     Sleep(sleepTime);
 
-    int color = getLightColor();
-    Sleep(sleepTime);
+    // int color = getLightColor();
+    // Sleep(sleepTime);
 
-    if (color == BLUE) {
-        drive(-5, speed);
-    } else if (color == RED) {
+    int color = moveAround(4);
+
+    if (color == RED) {
+        LCD.WriteLine("Light Color: RED");
         drive(-14, speed);
     } else {
-        return 0;
+        LCD.WriteLine("Light Color: BLUE");
+        drive(-8, speed);
     }
 
-    turn(40, speed);
+    turn(38, speed);
     Sleep(sleepTime);
 
-    // move until stopped
-    rightMotor.setPercent(25);
-    leftMotor.setPercent(25);
-    int lastCounts = 0;
-    Sleep(0.25);
-    while (rightMotor.counts() - lastCounts > 10) {
-        lastCounts = rightMotor.counts();
-        Sleep(0.25);
-    }
+    driveForwardUntilStopped();
 
     drive(-18, speed);
     Sleep(sleepTime);
@@ -132,10 +247,10 @@ int main() {
     turn(-90, speed);
     Sleep(sleepTime);
 
-    if (color == BLUE) {
-        drive(-13, speed);
-    } else if (color == RED) {
-        drive(-6, speed);
+    if (color == RED) {
+        drive(-7.5, speed);
+    } else {
+        drive(-13.5, speed);
     }
 
     turn(90, speed);
@@ -143,6 +258,11 @@ int main() {
 
     drive(-25, speed);
     Sleep(sleepTime);
+
+    // while (true) {
+    //     LCD.WriteLine(cdsCell.Value());
+    //     Sleep(0.5);
+    // }
 
     return 0;
 }
