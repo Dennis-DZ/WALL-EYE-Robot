@@ -15,7 +15,6 @@ public:
         servo = FEHServo(servoPort);
         servo.SetMin(min);
         servo.SetMax(max);
-        servo.SetDegree(0);
         currentDegree = 0;
     }
 
@@ -30,8 +29,14 @@ public:
 
         while (abs(degree - currentDegree) > 1) {
             setDegree(currentDegree + degreesPerSecond * (TimeNow() - t));
+            LCD.WriteLine(currentDegree);
             t = TimeNow();
+            Sleep(0.05);
         }
+    }
+
+    void touchCalibrate() {
+        servo.TouchCalibrate();
     }
 
 };

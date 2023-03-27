@@ -6,6 +6,7 @@
 #include "Motor.h"
 #include "Servo.h"
 #include <cmath>
+#include <FEHServo.h>
 
 using namespace std;
 
@@ -22,7 +23,7 @@ AnalogInputPin cdsCell(FEHIO::P3_7);
 Motor rightMotor(FEHMotor::Motor3, 9.0, distancePerCount, FEHIO::P0_0);
 Motor leftMotor(FEHMotor::Motor0, 9.0, distancePerCount, FEHIO::P0_7);
 
-Servo spatula(FEHServo::Servo0, 703, 2339);
+Servo spatula(FEHServo::Servo0, 692, 2332);
 
 enum Direction {
     CW,
@@ -194,7 +195,9 @@ int main() {
 
     float x, y;
 
-    RPS.InitializeTouchMenu();
+    // RPS.InitializeTouchMenu();
+
+    spatula.setDegree(180);
 
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
@@ -203,36 +206,52 @@ int main() {
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
-    int correctLever = RPS.GetCorrectLever();
+    while (getLightColor() == BLACK);
+
+    int correctLever = /*RPS.GetCorrectLever()*/0;
 
     drive(10, speed);
     Sleep(sleepTime);
 
-    turn(-90, speed);
+    turn(-75, speed);
     Sleep(sleepTime);
 
-    int forwardDistance = 14;
+    drive(14, speed);
+    Sleep(sleepTime);
+
+    turn(-5, speed);
+    Sleep(sleepTime);
 
     if (correctLever == 1) {
-        forwardDistance += 3.5;
+
+        drive(3.5, speed);
+        Sleep(sleepTime);
+
     } else if (correctLever == 2) {
-        forwardDistance += 7;
+
+        drive(7, speed);
+        Sleep(sleepTime);
+        
     }
 
-    drive(forwardDistance, speed);
+    turn(-76, speed);
     Sleep(sleepTime);
 
-    turn(-90, speed);
+    drive(-1.4, speed);
     Sleep(sleepTime);
 
-    drive(-3, speed);
-    Sleep(sleepTime);
+    // while (true) {
 
-    spatula.moveToDegree(110, 3);
+        spatula.moveToDegree(60, 0.5);
 
-    Sleep(5.0);
+        Sleep(5.0);
 
-    spatula.moveToDegree(0, 3);
+        spatula.moveToDegree(180, 0.5);
+
+    //     while (!LCD.Touch(&x,&y));
+    //     // while (LCD.Touch(&x,&y));
+
+    // }
 
     return 0;
 }
