@@ -13,10 +13,13 @@ using namespace std;
 const double distancePerCount = 6.0/242;
 //const double adjustmentFactor = 1.03;
 const double distanceBetweenWheels = 7.25;
-const double turnComp = 0.98;
+// const double turnComp = 0.98;
 const int pulsePercent = 15;
 const double pulseTime = 0.1;
+const double rpsWaitTime = 0.5;
 const double pi = 3.14159;
+const int speed = 6;
+const double sleepTime = 0.5;
 
 AnalogInputPin cdsCell(FEHIO::P3_7);
 
@@ -85,25 +88,79 @@ int getLightColor() {
     }
 }
 
+int getHeadingToPoint(double x, double y) {
+    while (RPS.Heading() < 0);
+    double deltaX = x - RPS.X(), deltaY = y - RPS.Y();
+    double arctan = atan(deltaY/deltaX) * (180 / pi);
+
+	if (deltaX < 0) {
+		return 180 + arctan;
+	} else if (arctan >= 0) {
+		return arctan;
+	} else {
+		return 360 + arctan;
+	}
+}
+
 void pulseTurn(Direction d) {
-    rightMotor.setPercent(pulsePercent * (d == CCW));
-    leftMotor.setPercent(pulsePercent * (d == CW));
+    rightMotor.setPercent(pulsePercent * (-1 + 2 * (d == CCW)));
+    leftMotor.setPercent(pulsePercent * (-1 + 2 * (d == CW)));
     Sleep(pulseTime);
     rightMotor.stop();
     leftMotor.stop();
 }
 
-void correctHeading(int degrees, Direction d) {
+Direction directionOfTurn(int delta) {
+    return (delta >= 0 && delta <= 180) || (delta <= -180 && delta >= -360) ? CCW : CW;
+}
+
+int signedDegreeDifference(int current, int target) {
+
+    // https://stackoverflow.com/a/30887154
+
+    int delta = target - current;
+
+    int d = abs(delta) % 360; 
+    int r = d > 180 ? 360 - d : d;
+
+    if (directionOfTurn(delta) == CW) {
+        r *= -1;
+    }
+
+    return r;
+}
+
+void correctHeading(int degrees) {
     while(RPS.Heading() < degrees - 1 || RPS.Heading() > degrees + 1) {
-        pulseTurn(d);
+        pulseTurn(directionOfTurn(degrees - RPS.Heading()));
+        Sleep(rpsWaitTime);
         while (RPS.Heading() < 0);
     }
 }
 
-void correctHeading(double x, double y, Direction d) {
-    while (RPS.Heading() < 0);
-    double deltaX = x - RPS.X(), deltaY = y - RPS.Y();
-    correctHeading(270 + atan(deltaY/deltaX) * (180 / pi), d);
+void correctHeading(double x, double y) {
+    correctHeading(getHeadingToPoint(x, y));
+}
+
+double distanceBetween(int currentX, int currentY, int targetX, int targetY) {
+    int deltaX = targetX - currentX, deltaY = targetY - currentY;
+    return sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+void driveToPoint(double x, double y) {
+
+    while(RPS.X() < 0);
+    double distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
+
+    while (distance > 15) {
+        correctHeading(x, y);
+        drive(7, speed);
+        while(RPS.X() < 0);
+        distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
+    }
+
+    correctHeading(x, y);
+    drive(distance, speed);
 }
 
 void driveForwardUntilStopped() {
@@ -126,7 +183,7 @@ double checkAndSleep(double minimum) {
     }
 }
 
-int moveAround(double speed) {
+int moveAround() {
     double minimum = 3.3;
 
     double distance = 0.5;
@@ -190,14 +247,11 @@ int moveAround(double speed) {
 
 int main() {
 
-    const int speed = 6;
-    const double sleepTime = 0.5;
-
     float x, y;
 
-    // RPS.InitializeTouchMenu();
-
     spatula.setDegree(180);
+
+    RPS.InitializeTouchMenu();
 
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
@@ -206,52 +260,46 @@ int main() {
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
-    while (getLightColor() == BLACK);
+    //while (getLightColor() == BLACK);
 
-    int correctLever = /*RPS.GetCorrectLever()*/0;
-
-    drive(10, speed);
+    driveToPoint(30, 18); // drive to base of ramp
     Sleep(sleepTime);
 
-    turn(-75, speed);
+    driveToPoint(30, 42); // drive to top of ramp
     Sleep(sleepTime);
 
-    drive(14, speed);
+    spatula.moveToDegree(55, 0.5); // lower spatula
     Sleep(sleepTime);
 
-    turn(-5, speed);
+    driveToPoint(29.5, 46.5); // drive up to stamp
     Sleep(sleepTime);
 
-    if (correctLever == 1) {
+    // spatula.setDegree(180); // flip up stamp
+    // Sleep(sleepTime);
 
-        drive(3.5, speed);
-        Sleep(sleepTime);
+    // turn(-30, speed); // turn towards open region
+    // Sleep(sleepTime);
 
-    } else if (correctLever == 2) {
+    // driveToPoint(15, 58); // drive to open region
+    // Sleep(sleepTime);
 
-        drive(7, speed);
-        Sleep(sleepTime);
-        
-    }
+    // turn(120, speed); // turn towards stamp
+    // Sleep(sleepTime);
 
-    turn(-76, speed);
-    Sleep(sleepTime);
+    // spatula.moveToDegree(60, 0.5); // lower spatula
+    // Sleep(sleepTime);
 
-    drive(-1.4, speed);
-    Sleep(sleepTime);
+    // driveToPoint(18.4, 57); // drive up to stamp
+    // Sleep(sleepTime);
 
-    // while (true) {
+    // correctHeading(0); // face to the left
+    // Sleep(sleepTime);
 
-        spatula.moveToDegree(60, 0.5);
+    // // spatula.setDegree(180); // flip up stamp
+    // Sleep(sleepTime);
 
-        Sleep(5.0);
-
-        spatula.moveToDegree(180, 0.5);
-
-    //     while (!LCD.Touch(&x,&y));
-    //     // while (LCD.Touch(&x,&y));
-
-    // }
+    // drive(-5, speed); // back up
+    // Sleep(sleepTime);
 
     return 0;
 }
