@@ -29,7 +29,6 @@ public:
 
         while (abs(degree - currentDegree) > 1) {
             setDegree(currentDegree + degreesPerSecond * (TimeNow() - t));
-            LCD.WriteLine(currentDegree);
             t = TimeNow();
             Sleep(0.05);
         }

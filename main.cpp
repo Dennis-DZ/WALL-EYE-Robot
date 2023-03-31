@@ -14,8 +14,8 @@ const double distancePerCount = 6.0/242;
 //const double adjustmentFactor = 1.03;
 const double distanceBetweenWheels = 7.25;
 // const double turnComp = 0.98;
-const int pulsePercent = 15;
-const double pulseTime = 0.1;
+const int pulsePercent = 20;
+const double pulseTime = 0.07;
 const double rpsWaitTime = 0.5;
 const double pi = 3.14159;
 const int speed = 6;
@@ -62,8 +62,8 @@ void move(double rightDistance, double leftDistance, double time) {
 
 void drive(double distance, double speed) {
     move(distance, distance, distance/speed);
-    string message = "Drove " + to_string(distance) + " in";
-    LCD.WriteLine(message.c_str());
+    // string message = "Drove " + to_string(distance) + " in";
+    // LCD.WriteLine(message.c_str());
 }
 
 void turn(int degrees, double speed) {
@@ -136,6 +136,9 @@ void correctHeading(int degrees) {
         Sleep(rpsWaitTime);
         while (RPS.Heading() < 0);
     }
+
+    string message = "Now facing " + to_string(RPS.Heading());
+    LCD.WriteLine(message.c_str());
 }
 
 void correctHeading(double x, double y) {
@@ -147,7 +150,7 @@ double distanceBetween(int currentX, int currentY, int targetX, int targetY) {
     return sqrt(deltaX * deltaX + deltaY * deltaY);
 }
 
-void driveToPoint(double x, double y) {
+void driveToPoint(double x, double y, double speed) {
 
     while(RPS.X() < 0);
     double distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
@@ -155,12 +158,16 @@ void driveToPoint(double x, double y) {
     while (distance > 15) {
         correctHeading(x, y);
         drive(7, speed);
+        Sleep(rpsWaitTime);
         while(RPS.X() < 0);
         distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
     }
 
     correctHeading(x, y);
     drive(distance, speed);
+
+    string message = "Drove to " + to_string(RPS.X()) + ", " + to_string(RPS.Y());
+    LCD.WriteLine(message.c_str());
 }
 
 void driveForwardUntilStopped() {
@@ -256,50 +263,36 @@ int main() {
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
 
+    LCD.ClearBuffer();
     LCD.WriteLine("Touch the screen");
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
-    //while (getLightColor() == BLACK);
+    while (getLightColor() == BLACK);
 
-    driveToPoint(30, 18); // drive to base of ramp
+    driveToPoint(30, 18, speed); // drive to base of ramp
     Sleep(sleepTime);
 
-    driveToPoint(30, 42); // drive to top of ramp
+    correctHeading(getHeadingToPoint(30.25, 42)); // turn to top of ramp
+    Sleep(sleepTime);
+
+    drive(23, speed); // drive to top of ramp
     Sleep(sleepTime);
 
     spatula.moveToDegree(55, 0.5); // lower spatula
     Sleep(sleepTime);
 
-    driveToPoint(29.5, 46.5); // drive up to stamp
+    driveToPoint(29.5, 44, speed); // line up with stamp
     Sleep(sleepTime);
 
-    // spatula.setDegree(180); // flip up stamp
-    // Sleep(sleepTime);
+    correctHeading(90); // face stamp
+    Sleep(sleepTime);
 
-    // turn(-30, speed); // turn towards open region
-    // Sleep(sleepTime);
+    driveToPoint(RPS.X(), 46.5, speed); // drive up to stamp
+    Sleep(sleepTime);
 
-    // driveToPoint(15, 58); // drive to open region
-    // Sleep(sleepTime);
-
-    // turn(120, speed); // turn towards stamp
-    // Sleep(sleepTime);
-
-    // spatula.moveToDegree(60, 0.5); // lower spatula
-    // Sleep(sleepTime);
-
-    // driveToPoint(18.4, 57); // drive up to stamp
-    // Sleep(sleepTime);
-
-    // correctHeading(0); // face to the left
-    // Sleep(sleepTime);
-
-    // // spatula.setDegree(180); // flip up stamp
-    // Sleep(sleepTime);
-
-    // drive(-5, speed); // back up
-    // Sleep(sleepTime);
+    spatula.setDegree(180); // flip up stamp
+    Sleep(sleepTime);
 
     return 0;
 }
