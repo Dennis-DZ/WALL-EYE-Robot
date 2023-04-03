@@ -123,7 +123,7 @@ int signedDegreeDifference(int current, int target) {
     int d = abs(delta) % 360; 
     int r = d > 180 ? 360 - d : d;
 
-    if (directionOfTurn(delta) == CW) {
+    if (directionOfTurn(delta) == CCW) {
         r *= -1;
     }
 
@@ -141,10 +141,6 @@ void correctHeading(int degrees) {
     LCD.WriteLine(message.c_str());
 }
 
-void correctHeading(double x, double y) {
-    correctHeading(getHeadingToPoint(x, y));
-}
-
 double distanceBetween(int currentX, int currentY, int targetX, int targetY) {
     int deltaX = targetX - currentX, deltaY = targetY - currentY;
     return sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -152,18 +148,20 @@ double distanceBetween(int currentX, int currentY, int targetX, int targetY) {
 
 void driveToPoint(double x, double y, double speed) {
 
+    turnAndCorrect(getHeadingToPoint(x, y), speed);
+
     while(RPS.X() < 0);
     double distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
 
     while (distance > 15) {
-        correctHeading(x, y);
+        correctHeading(getHeadingToPoint(x, y));
         drive(7, speed);
         Sleep(rpsWaitTime);
         while(RPS.X() < 0);
         distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
     }
 
-    correctHeading(x, y);
+    correctHeading(getHeadingToPoint(x, y));
     drive(distance, speed);
 
     string message = "Drove to " + to_string(RPS.X()) + ", " + to_string(RPS.Y());
@@ -181,75 +179,10 @@ void driveForwardUntilStopped() {
     }
 }
 
-double checkAndSleep(double minimum) {
-    Sleep(0.5);
-    if (cdsCell.Value() < minimum) {
-        return cdsCell.Value();
-    } else {
-        return minimum;
-    }
-}
-
-int moveAround() {
-    double minimum = 3.3;
-
-    double distance = 0.5;
-
-    drive(-1 * distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(-1 * distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    turn(10, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(-1 * distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(-1 * distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    turn(-20, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(-1 * distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(-1 * distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    turn(10, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    drive(distance, speed);
-    minimum = checkAndSleep(minimum);
-
-    if (minimum < 0.55) {
-        //LCD.WriteLine("Light Color: RED");
-        return RED;
-    } else if (minimum < 2) {
-        //LCD.WriteLine("Light Color: BLUE");
-        return BLUE;
-    } else {
-        //LCD.WriteLine("Light Color: NONE");
-        return BLACK;
-    }
+void turnAndCorrect(int degrees, double speed) {
+    while (RPS.Heading() < 0);
+    turn(signedDegreeDifference(RPS.Heading(), degrees), speed);
+    correctHeading(degrees);
 }
 
 int main() {
@@ -273,7 +206,7 @@ int main() {
     driveToPoint(30, 18, speed); // drive to base of ramp
     Sleep(sleepTime);
 
-    correctHeading(getHeadingToPoint(30.25, 42)); // turn to top of ramp
+    turnAndCorrect(getHeadingToPoint(30.25, 42), speed); // turn to top of ramp
     Sleep(sleepTime);
 
     drive(23, speed); // drive to top of ramp
@@ -285,7 +218,7 @@ int main() {
     driveToPoint(29.5, 44, speed); // line up with stamp
     Sleep(sleepTime);
 
-    correctHeading(90); // face stamp
+    turnAndCorrect(90, speed); // face stamp
     Sleep(sleepTime);
 
     driveToPoint(RPS.X(), 46.5, speed); // drive up to stamp
