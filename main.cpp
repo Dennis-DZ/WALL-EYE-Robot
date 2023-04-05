@@ -7,6 +7,7 @@
 #include "Servo.h"
 #include <cmath>
 #include <FEHServo.h>
+#include <FEHSD.h>
 
 using namespace std;
 
@@ -27,6 +28,9 @@ Motor rightMotor(FEHMotor::Motor3, 9.0, distancePerCount, FEHIO::P0_0);
 Motor leftMotor(FEHMotor::Motor0, 9.0, distancePerCount, FEHIO::P0_7);
 
 Servo spatula(FEHServo::Servo0, 692, 2332);
+Servo luggageGate(FEHServo::Servo1, 500, 2415);
+
+FEHFile *outFile;
 
 enum Direction {
     CW,
@@ -62,8 +66,9 @@ void move(double rightDistance, double leftDistance, double time) {
 
 void drive(double distance, double speed) {
     move(distance, distance, distance/speed);
-    // string message = "Drove " + to_string(distance) + " in";
-    // LCD.WriteLine(message.c_str());
+    string message = "Drove " + to_string(distance) + " in";
+    LCD.WriteLine(message.c_str());
+    SD.FPrintf(outFile, (message + "\n").c_str());
 }
 
 void turn(int degrees, double speed) {
@@ -146,16 +151,24 @@ double distanceBetween(int currentX, int currentY, int targetX, int targetY) {
     return sqrt(deltaX * deltaX + deltaY * deltaY);
 }
 
-void driveToPoint(double x, double y, double speed) {
+void turnAndCorrect(int degrees, double speed) {
+    while (RPS.Heading() < 0);
+    turn(signedDegreeDifference(RPS.Heading(), degrees), speed);
+    correctHeading(degrees);
+}
+
+void driveToPoint(double x, double y, double speed, bool careful) {
+
+    double factor = 1 - 0.34 * careful;
 
     turnAndCorrect(getHeadingToPoint(x, y), speed);
 
     while(RPS.X() < 0);
     double distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
 
-    while (distance > 15) {
+    while (distance > 15 * factor) {
         correctHeading(getHeadingToPoint(x, y));
-        drive(7, speed);
+        drive(7 * factor, speed);
         Sleep(rpsWaitTime);
         while(RPS.X() < 0);
         distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
@@ -163,9 +176,11 @@ void driveToPoint(double x, double y, double speed) {
 
     correctHeading(getHeadingToPoint(x, y));
     drive(distance, speed);
+    Sleep(rpsWaitTime);
 
     string message = "Drove to " + to_string(RPS.X()) + ", " + to_string(RPS.Y());
     LCD.WriteLine(message.c_str());
+    SD.FPrintf(outFile, (message + "\n").c_str());
 }
 
 void driveForwardUntilStopped() {
@@ -179,52 +194,67 @@ void driveForwardUntilStopped() {
     }
 }
 
-void turnAndCorrect(int degrees, double speed) {
-    while (RPS.Heading() < 0);
-    turn(signedDegreeDifference(RPS.Heading(), degrees), speed);
-    correctHeading(degrees);
-}
-
 int main() {
+
+    outFile = SD.FOpen("log.txt", "w");
 
     float x, y;
 
     spatula.setDegree(180);
 
-    RPS.InitializeTouchMenu();
-
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
 
     LCD.ClearBuffer();
-    LCD.WriteLine("Touch the screen");
+    LCD.WriteLine("Touch the screen to load luggage");
+    while (!LCD.Touch(&x,&y));
+    while (LCD.Touch(&x,&y));
+
+    luggageGate.setDegree(170);
+
+    RPS.InitializeTouchMenu();
+
+    LCD.ClearBuffer();
+    LCD.WriteLine("Touch the screen to start");
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
     while (getLightColor() == BLACK);
 
-    driveToPoint(30, 18, speed); // drive to base of ramp
+    driveToPoint(31, 18, speed, false); // drive to base of ramp
     Sleep(sleepTime);
 
-    turnAndCorrect(getHeadingToPoint(30.25, 42), speed); // turn to top of ramp
+    turnAndCorrect(90, speed); // turn to top of ramp
     Sleep(sleepTime);
 
-    drive(23, speed); // drive to top of ramp
+    drive(26, speed); // drive to top of ramp
     Sleep(sleepTime);
 
-    spatula.moveToDegree(55, 0.5); // lower spatula
+    driveToPoint(19, 44.6, speed, true); // drive next to drop off
     Sleep(sleepTime);
 
-    driveToPoint(29.5, 44, speed); // line up with stamp
+    turnAndCorrect(180, speed); // align with drop off
     Sleep(sleepTime);
 
-    turnAndCorrect(90, speed); // face stamp
+    luggageGate.setDegree(70); // lower luggage gate
+    Sleep(2.0);
+
+    luggageGate.setDegree(170); // raise luggage gate
     Sleep(sleepTime);
 
-    driveToPoint(RPS.X(), 46.5, speed); // drive up to stamp
+    driveToPoint(31, 42, speed, true); // drive to top of ramp
     Sleep(sleepTime);
 
-    spatula.setDegree(180); // flip up stamp
+    turnAndCorrect(270, speed); // turn to bottom of ramp
+    Sleep(sleepTime);
+
+    drive(26, speed); // drive to bottom of ramp
+    Sleep(sleepTime);
+
+    turnAndCorrect(255, speed); // turn towards final button
+    Sleep(sleepTime);
+
+    driveForwardUntilStopped(); // run into final button
     Sleep(sleepTime);
 
     return 0;
