@@ -12,9 +12,8 @@
 using namespace std;
 
 const double distancePerCount = 6.0/242;
-//const double adjustmentFactor = 1.03;
 const double distanceBetweenWheels = 7.25;
-// const double turnComp = 0.98;
+const double turnComp = 0.75;
 const int pulsePercent = 20;
 const double pulseTime = 0.07;
 const double rpsWaitTime = 0.5;
@@ -27,7 +26,9 @@ AnalogInputPin cdsCell(FEHIO::P3_7);
 Motor rightMotor(FEHMotor::Motor3, 9.0, distancePerCount, FEHIO::P0_0);
 Motor leftMotor(FEHMotor::Motor0, 9.0, distancePerCount, FEHIO::P0_7);
 
+// spatula straight up degree = 150, all the way back = 172, down to ground is 35
 Servo spatula(FEHServo::Servo0, 692, 2332);
+// gate up degree = 170, open = 70;
 Servo luggageGate(FEHServo::Servo1, 500, 2415);
 
 FEHFile *outFile;
@@ -72,7 +73,7 @@ void drive(double distance, double speed) {
 }
 
 void turn(int degrees, double speed) {
-    double distance = (pi * distanceBetweenWheels) * (degrees / 360.0);
+    double distance = (pi * distanceBetweenWheels) * (degrees / 360.0) * turnComp;
     move(-1 * distance, distance, distance/speed);
     string message = "Turned " + to_string(degrees) + " degrees";
     LCD.WriteLine(message.c_str());
@@ -200,26 +201,37 @@ int main() {
 
     float x, y;
 
-    spatula.setDegree(180);
+    spatula.setDegree(150);
 
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
 
     LCD.ClearBuffer();
-    LCD.WriteLine("Touch the screen to load luggage");
+    LCD.WriteLine("Tap to load luggage");
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
     luggageGate.setDegree(170);
+    Sleep(1.0);
+
+    LCD.ClearBuffer();
+    LCD.WriteLine("Tap to move back spatula");
+    while (!LCD.Touch(&x,&y));
+    while (LCD.Touch(&x,&y));
+
+    spatula.setDegree(172);
 
     RPS.InitializeTouchMenu();
 
     LCD.ClearBuffer();
-    LCD.WriteLine("Touch the screen to start");
+    LCD.WriteLine("Tap to start");
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
     while (getLightColor() == BLACK);
+
+    spatula.setDegree(150); // move spatula straight up
+    Sleep(sleepTime);
 
     driveToPoint(31, 18, speed, false); // drive to base of ramp
     Sleep(sleepTime);
@@ -227,7 +239,25 @@ int main() {
     turnAndCorrect(90, speed); // turn to top of ramp
     Sleep(sleepTime);
 
-    drive(26, speed); // drive to top of ramp
+    drive(24, speed); // drive to top of ramp
+    Sleep(sleepTime);
+
+    spatula.moveToDegree(35, 0.5); // lower spatula
+    Sleep(sleepTime);
+
+    driveToPoint(29.5, 44, speed, false); // line up with stamp
+    Sleep(sleepTime);
+
+    turnAndCorrect(90, speed); // face stamp
+    Sleep(sleepTime);
+
+    driveToPoint(RPS.X(), 46, speed, false); // drive up to stamp
+    Sleep(sleepTime);
+
+    spatula.setDegree(150); // flip up stamp
+    Sleep(sleepTime);
+
+    drive(-3, speed); // back up
     Sleep(sleepTime);
 
     driveToPoint(19, 44.6, speed, true); // drive next to drop off
@@ -242,19 +272,61 @@ int main() {
     luggageGate.setDegree(170); // raise luggage gate
     Sleep(sleepTime);
 
-    driveToPoint(31, 42, speed, true); // drive to top of ramp
+    driveToPoint(12.6, 62.3, speed, false); // drive to kiosk light
     Sleep(sleepTime);
 
-    turnAndCorrect(270, speed); // turn to bottom of ramp
+    drive(-3, speed); // back up
     Sleep(sleepTime);
 
-    drive(26, speed); // drive to bottom of ramp
+    if (getLightColor() == RED) {
+        driveToPoint(19.7, 55.7, speed, false); // line up with red button
+    } else {
+        driveToPoint(14.5, 58.2, speed, false); // line up with blue button
+    }
+
+    turnAndCorrect(90, speed); // face kiosk
     Sleep(sleepTime);
 
-    turnAndCorrect(255, speed); // turn towards final button
+    driveForwardUntilStopped(); // drive into kiosk button
     Sleep(sleepTime);
 
-    driveForwardUntilStopped(); // run into final button
+    drive(-5, speed); // back up
+    Sleep(sleepTime);
+
+    driveToPoint(5, 45, speed, false); // drive to top of steep ramp
+    Sleep(sleepTime);
+
+    turnAndCorrect(270, speed); // turn towards bottom of ramp
+    Sleep(sleepTime);
+
+    drive(20, speed); // drive to bottom of ramp
+    Sleep(sleepTime);
+
+    switch (RPS.GetCorrectLever()) {
+    case 0:
+        driveToPoint(7.1, 23, speed, false); // drive up to left lever
+        correctHeading(298);
+        break;
+    case 1:
+        driveToPoint(6.8, 24.5, speed, false); // drive up to middle lever
+        correctHeading(277);
+        break;
+    case 2:
+    default:
+        driveToPoint(7.2, 24.3, speed, false); // drive up to right lever
+        correctHeading(257);
+        break;
+    }
+
+    spatula.setDegree(35); // flip down lever
+    Sleep(sleepTime);
+
+    Sleep(5.0); // wait 5 seconds
+
+    spatula.setDegree(150); // flip up lever
+    Sleep(sleepTime);
+
+    driveToPoint(36, 0, speed, false); // drive to and press final button
     Sleep(sleepTime);
 
     return 0;
