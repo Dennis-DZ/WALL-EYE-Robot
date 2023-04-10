@@ -18,8 +18,8 @@ const int pulsePercent = 20;
 const double pulseTime = 0.07;
 const double rpsWaitTime = 0.5;
 const double pi = 3.14159;
-const int speed = 6;
-const double sleepTime = 0.5;
+const int speed = 10;
+const double sleepTime = 0.25;
 
 AnalogInputPin cdsCell(FEHIO::P3_7);
 
@@ -79,8 +79,7 @@ void turn(int degrees, double speed) {
     LCD.WriteLine(message.c_str());
 }
 
-int getLightColor() {
-    double reading = cdsCell.Value();
+int getLightColor(double reading) {
     //LCD.WriteLine(reading);
     if (reading < 0.55) {
         //LCD.WriteLine("Light Color: RED");
@@ -92,6 +91,23 @@ int getLightColor() {
         //LCD.WriteLine("Light Color: NONE");
         return BLACK;
     }
+}
+
+double getMinCdsReading() {
+
+    double rightWheel[8] = {-1, 0, -1, 2, 2, -2, -3, 1};
+    double leftWheel[8] = {0, -1, -1, 0, 2, -2, 3, 1};
+    double min = 3.3;
+
+    for (int i = 0; i < 8; i++) {
+        move(rightWheel[i], leftWheel[i], 0.25);
+        double reading = cdsCell.Value();
+        if (reading < min) {
+            min = reading;
+        }
+    }
+
+    return min;
 }
 
 int getHeadingToPoint(double x, double y) {
@@ -111,6 +127,22 @@ int getHeadingToPoint(double x, double y) {
 void pulseTurn(Direction d) {
     rightMotor.setPercent(pulsePercent * (-1 + 2 * (d == CCW)));
     leftMotor.setPercent(pulsePercent * (-1 + 2 * (d == CW)));
+    Sleep(pulseTime);
+    rightMotor.stop();
+    leftMotor.stop();
+}
+
+void pulseForward() {
+    rightMotor.setPercent(pulsePercent);
+    leftMotor.setPercent(pulsePercent);
+    Sleep(pulseTime);
+    rightMotor.stop();
+    leftMotor.stop();
+}
+
+void pulseBackward() {
+    rightMotor.setPercent(-1 * pulsePercent);
+    leftMotor.setPercent(-1 * pulsePercent);
     Sleep(pulseTime);
     rightMotor.stop();
     leftMotor.stop();
@@ -137,13 +169,41 @@ int signedDegreeDifference(int current, int target) {
 }
 
 void correctHeading(int degrees) {
-    while(RPS.Heading() < degrees - 1 || RPS.Heading() > degrees + 1) {
+    while (RPS.Heading() < degrees - 2 || RPS.Heading() > degrees + 2) {
         pulseTurn(directionOfTurn(degrees - RPS.Heading()));
         Sleep(rpsWaitTime);
         while (RPS.Heading() < 0);
     }
 
     string message = "Now facing " + to_string(RPS.Heading());
+    LCD.WriteLine(message.c_str());
+}
+
+void checkY(double y, bool backwards) {
+    while (RPS.Y() < y - 0.25 || RPS.Y() > y + 0.25) {
+        if ((backwards && RPS.Y() > y) || (!backwards && RPS.Y() < y)) {
+            pulseForward();
+        } else {
+            pulseBackward();
+        }
+        Sleep(rpsWaitTime);
+        while (RPS.Heading() < 0);
+    }
+    string message = "Corrected Y to " + to_string(RPS.Y());
+    LCD.WriteLine(message.c_str());
+}
+
+void checkX(double x, bool backwards) {
+    while (RPS.X() < x - 0.25 || RPS.X() > x + 0.25) {
+        if ((backwards && RPS.X() > x) || (!backwards && RPS.X() < x)) {
+            pulseForward();
+        } else {
+            pulseBackward();
+        }
+        Sleep(rpsWaitTime);
+        while (RPS.Heading() < 0);
+    }
+    string message = "Corrected X to " + to_string(RPS.X());
     LCD.WriteLine(message.c_str());
 }
 
@@ -154,7 +214,9 @@ double distanceBetween(int currentX, int currentY, int targetX, int targetY) {
 
 void turnAndCorrect(int degrees, double speed) {
     while (RPS.Heading() < 0);
-    turn(signedDegreeDifference(RPS.Heading(), degrees), speed);
+    while (abs(degrees - RPS.Heading()) > 30) {
+        turn(signedDegreeDifference(RPS.Heading(), degrees), speed);
+    }
     correctHeading(degrees);
 }
 
@@ -212,80 +274,82 @@ int main() {
     while (LCD.Touch(&x,&y));
 
     luggageGate.setDegree(170);
-    Sleep(1.0);
-
-    LCD.ClearBuffer();
-    LCD.WriteLine("Tap to move back spatula");
-    while (!LCD.Touch(&x,&y));
-    while (LCD.Touch(&x,&y));
-
-    spatula.setDegree(172);
+    Sleep(1.0);    
 
     RPS.InitializeTouchMenu();
+    spatula.setDegree(172);
 
     LCD.ClearBuffer();
     LCD.WriteLine("Tap to start");
     while (!LCD.Touch(&x,&y));
     while (LCD.Touch(&x,&y));
 
-    while (getLightColor() == BLACK);
+    while (getLightColor(cdsCell.Value()) == BLACK);
 
     spatula.setDegree(150); // move spatula straight up
-    Sleep(sleepTime);
+    //Sleep(sleepTime);
 
-    driveToPoint(31, 18, speed, false); // drive to base of ramp
+    driveToPoint(32, 18, speed, false); // drive to base of ramp
     Sleep(sleepTime);
 
     turnAndCorrect(90, speed); // turn to top of ramp
+    //Sleep(sleepTime);
+
+    drive(22, speed); // drive to top of ramp
     Sleep(sleepTime);
 
-    drive(24, speed); // drive to top of ramp
-    Sleep(sleepTime);
+    checkY(40.6, false); // adjust y
+    //Sleep(sleepTime);
 
     spatula.moveToDegree(35, 0.5); // lower spatula
-    Sleep(sleepTime);
+    //Sleep(sleepTime);
 
     driveToPoint(29.5, 44, speed, false); // line up with stamp
     Sleep(sleepTime);
 
     turnAndCorrect(90, speed); // face stamp
-    Sleep(sleepTime);
+    //Sleep(sleepTime);
 
-    driveToPoint(RPS.X(), 46, speed, false); // drive up to stamp
+    driveToPoint(RPS.X(), 45.75, speed, false); // drive up to stamp
     Sleep(sleepTime);
 
     spatula.setDegree(150); // flip up stamp
-    Sleep(sleepTime);
+    //Sleep(sleepTime);
 
     drive(-3, speed); // back up
     Sleep(sleepTime);
 
-    driveToPoint(19, 44.6, speed, true); // drive next to drop off
+    driveToPoint(18.5, 44.6, speed, true); // drive next to drop off
     Sleep(sleepTime);
 
     turnAndCorrect(180, speed); // align with drop off
-    Sleep(sleepTime);
+    //Sleep(sleepTime);
 
     luggageGate.setDegree(70); // lower luggage gate
-    Sleep(2.0);
+    Sleep(1.0);
 
     luggageGate.setDegree(170); // raise luggage gate
+    //Sleep(sleepTime);
+
+    driveToPoint(12.6, 61.4, speed, false); // drive to kiosk light
     Sleep(sleepTime);
 
-    driveToPoint(12.6, 62.3, speed, false); // drive to kiosk light
+    int lightColor = getLightColor(getMinCdsReading());
+
+    turnAndCorrect(135, speed); // turn to face wall
+    //Sleep(sleepTime);
+
+    drive(-15, speed); // back up
     Sleep(sleepTime);
 
-    drive(-3, speed); // back up
-    Sleep(sleepTime);
-
-    if (getLightColor() == RED) {
-        driveToPoint(19.7, 55.7, speed, false); // line up with red button
+    if (lightColor == RED) {
+        driveToPoint(23.5, 58.8, speed, false); // line up with red button
     } else {
-        driveToPoint(14.5, 58.2, speed, false); // line up with blue button
+        driveToPoint(17.6, 58.5, speed, false); // line up with blue button
     }
 
     turnAndCorrect(90, speed); // face kiosk
-    Sleep(sleepTime);
+    //Sleep(sleepTime);
 
     driveForwardUntilStopped(); // drive into kiosk button
     Sleep(sleepTime);
@@ -297,9 +361,12 @@ int main() {
     Sleep(sleepTime);
 
     turnAndCorrect(270, speed); // turn towards bottom of ramp
+    //Sleep(sleepTime);
+
+    drive(18, speed); // drive to bottom of ramp
     Sleep(sleepTime);
 
-    drive(20, speed); // drive to bottom of ramp
+    checkY(25, true); // adjust y
     Sleep(sleepTime);
 
     switch (RPS.GetCorrectLever()) {
@@ -324,6 +391,9 @@ int main() {
     Sleep(5.0); // wait 5 seconds
 
     spatula.setDegree(150); // flip up lever
+    Sleep(sleepTime);
+
+    driveToPoint(17.4, 22.7, speed, false); // drive towards final button avoiding dead zone
     Sleep(sleepTime);
 
     driveToPoint(36, 0, speed, false); // drive to and press final button
