@@ -76,7 +76,7 @@ void move(double rightDistance, double leftDistance, double time) {
 
 void drive(double distance, double speed) {
     move(distance, distance, distance/speed);
-    Sleep(sleepTime);
+    Sleep(rpsWaitTime);
 }
 
 void turn(int degrees, double speed) {
@@ -105,6 +105,8 @@ double getMinCdsReading() {
     for (int i = 0; i < 8; i++) {
         move(rightWheel[i], leftWheel[i], 0.1 * max(abs(rightWheel[i]), abs(leftWheel[i])));
         double reading = cdsCell.Value();
+        getLightColor(reading);
+        log(reading);
         if (reading < min) {
             min = reading;
         }
@@ -223,7 +225,7 @@ void turnAndCorrect(int degrees, double speed) {
     while (RPS.Heading() < 0);
     Sleep(rpsWaitTime);
     while (abs(signedDegreeDifference(RPS.Heading(), degrees)) > 10) {
-        turn(signedDegreeDifference(RPS.Heading(), degrees) / divisor, speed);
+        turn(signedDegreeDifference(RPS.Heading(), degrees) / divisor++, speed);
         Sleep(rpsWaitTime);
         log("Facing " + to_string(RPS.Heading()));
     }
@@ -243,14 +245,14 @@ void driveToPoint(double x, double y, double speed, bool careful) {
     while (distance > 15 * factor) {
         correctHeading(getHeadingToPoint(x, y));
         drive(7 * factor, speed);
-        Sleep(rpsWaitTime);
+        //Sleep(rpsWaitTime);
         while(RPS.X() < 0);
         distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
     }
 
     correctHeading(getHeadingToPoint(x, y));
     drive(distance, speed);
-    Sleep(rpsWaitTime);
+    //Sleep(rpsWaitTime);
 
     println();
     log("Drove to " + to_string(RPS.X()) + ", " + to_string(RPS.Y()));
@@ -268,8 +270,6 @@ void driveForwardUntilStopped() {
 }
 
 int main() {
-
-    // 27, 9
 
     outFile = SD.FOpen("log.txt", "w");
 
@@ -370,13 +370,14 @@ int main() {
         correctHeading(298);
         break;
     case 1:
-        driveToPoint(6.8, 24.5, speed, false); // drive up to middle lever
-        correctHeading(277);
+        driveToPoint(5.7, 23.4, speed, false); // drive up to middle lever
+        correctHeading(287);
+        drive(-0.15, speed);
         break;
     case 2:
     default:
-        driveToPoint(7.2, 24.3, speed, false); // drive up to right lever
-        correctHeading(257);
+        driveToPoint(5.1, 24, speed, false); // drive up to right lever
+        correctHeading(269);
         break;
     }
 
