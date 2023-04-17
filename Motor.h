@@ -51,8 +51,4 @@ public:
         return encoder.Counts();
     }
 
-    bool isStalled() {
-        return false;
-    }
-
 };

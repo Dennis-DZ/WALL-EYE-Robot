@@ -49,7 +49,7 @@ void log(string message) {
 
 void move(double rightDistance, double leftDistance, double time) {
 
-    double pidSleepTime = 0.15;
+    const double pidSleepTime = 0.15;
     int rightSign = (rightDistance > 0) - (rightDistance < 0), leftSign = (leftDistance > 0) - (leftDistance < 0);
     double counts = (abs(rightDistance) + abs(leftDistance)) * (1 / distancePerCount);
     double rightSpeed = rightDistance / time, leftSpeed = leftDistance / time;
@@ -65,9 +65,6 @@ void move(double rightDistance, double leftDistance, double time) {
         leftMotor.setPercent(leftSign * leftMotor.PIDAdjustment(TimeNow() - t, leftSpeed));
         t = TimeNow();
         Sleep(pidSleepTime);
-        if (rightMotor.isStalled() && leftMotor.isStalled()) {
-            break;
-        }
     }
 
     rightMotor.stop();
