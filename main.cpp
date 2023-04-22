@@ -288,6 +288,11 @@ int main() {
     RPS.InitializeTouchMenu();
     spatula.setDegree(172);
 
+    char course = RPS.CurrentRegionLetter();
+    string message = "Course ";
+    message.push_back(course);
+    log(message);
+
     LCD.ClearBuffer();
     LCD.WriteLine("Tap to start");
     while (!LCD.Touch(&x,&y));
@@ -299,9 +304,20 @@ int main() {
 
     spatula.setDegree(150); // move spatula straight up
 
-    driveToPoint(32, 18, speed, false); // drive to base of ramp
+    /////////////////////////////////////////
+    if (true) {
 
-    turnAndCorrect(90, speed); // turn to top of ramp
+    if (course == 'D') {
+        driveToPoint(31, 18, speed, false); // drive to base of ramp for course D
+    } else {
+        driveToPoint(32, 18, speed, false); // drive to base of ramp for other courses
+    }
+
+    if (course == 'D') {
+        turnAndCorrect(90, speed); // turn to top of ramp for course D
+    } else {
+        turnAndCorrect(90, speed); // turn to top of ramp for other courses
+    }
 
     drive(20, speed); // drive to top of ramp
 
@@ -313,9 +329,15 @@ int main() {
 
     turnAndCorrect(90, speed); // face stamp
 
-    driveToPoint(RPS.X(), 45.75, speed, false); // drive up to stamp
+    //driveToPoint(RPS.X(), 45.75, speed, false); // drive up to stamp
 
-    checkY(47, false); // adjust y
+    if (course == 'C') {
+        checkY(47, false); // adjust y for course C
+    } else if (course == 'B') {
+        checkY(46.5, false); // adjust y for course B
+    } else if (course) {
+        checkY(46.75, false); // adjust y for course A and D
+    }
 
     spatula.setDegree(150); // flip up stamp
 
@@ -339,11 +361,11 @@ int main() {
 
     turnAndCorrect(135, speed); // turn to face wall
 
-    drive(-10, speed); // back up
-
     if (lightColor == RED) {
+        drive(-13, speed); // back up to red
         driveToPoint(23.5, 58.8, speed, false); // line up with red button
     } else {
+        drive(-7, speed); // back up to blue
         driveToPoint(17.6, 58.5, speed, false); // line up with blue button
     }
 
@@ -352,6 +374,9 @@ int main() {
     driveForwardUntilStopped(); // drive into kiosk button
 
     drive(-5, speed); // back up
+
+    }
+    ///////////////////////////////////////
 
     driveToPoint(5, 45, speed, false); // drive to top of steep ramp
 
@@ -364,12 +389,27 @@ int main() {
     switch (RPS.GetCorrectLever()) {
     case 0:
         driveToPoint(7.1, 23, speed, false); // drive up to left lever
-        correctHeading(298);
+
+        if (course == 'B') {
+            correctHeading(293); // correct heading for course B
+            drive(0.2, speed); // move forward a little for B
+        } else {
+            correctHeading(298); // correct heading for other courses
+        }
+
         break;
     case 1:
         driveToPoint(5.7, 23.4, speed, false); // drive up to middle lever
-        correctHeading(287);
-        drive(-0.15, speed);
+        correctHeading(285);
+
+        if (course == 'B') {
+            drive(-0.3, speed); // move back a little for course B
+        } else if (course == 'A') {
+            drive(-0.15, speed); // move back a little less for A
+        } else {
+            drive(-0.45, speed); // move back a little more for C and D
+        }
+
         break;
     case 2:
     default:
