@@ -16,7 +16,7 @@ const double distanceBetweenWheels = 7.25;
 const double turnComp = 0.75;
 const int pulsePercent = 20;
 const double pulseTime = 0.07;
-const double rpsWaitTime = 0.5;
+const double rpsWaitTime = 0.33;
 const double pi = 3.14159;
 const int speed = 10;
 const double sleepTime = 0.25;
@@ -82,7 +82,7 @@ void turn(int degrees, double speed) {
 }
 
 int getLightColor(double reading) {
-    if (reading < 0.55) {
+    if (reading < 0.4) {
         log("Light Color: RED");
         return RED;
     } else if (reading < 2) {
@@ -242,14 +242,14 @@ void driveToPoint(double x, double y, double speed, bool careful) {
     while (distance > 15 * factor) {
         correctHeading(getHeadingToPoint(x, y));
         drive(7 * factor, speed);
-        //Sleep(rpsWaitTime);
         while(RPS.X() < 0);
         distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
     }
 
+    Sleep(0.5);
+    distance = distanceBetween(RPS.X(), RPS.Y(), x, y);
     correctHeading(getHeadingToPoint(x, y));
     drive(distance, speed);
-    //Sleep(rpsWaitTime);
 
     println();
     log("Drove to " + to_string(RPS.X()) + ", " + to_string(RPS.Y()));
@@ -357,7 +357,10 @@ int main() {
 
     driveToPoint(12.6, 61.4, speed, false); // drive to kiosk light
 
-    int lightColor = getLightColor(getMinCdsReading()); // move around to get best light reading
+    double minReading = getMinCdsReading(); // move around to get best light reading
+    log("Min Reading: " + to_string(minReading));
+
+    int lightColor = getLightColor(minReading);
 
     turnAndCorrect(135, speed); // turn to face wall
 
@@ -365,7 +368,7 @@ int main() {
         drive(-13, speed); // back up to red
         driveToPoint(23.5, 58.8, speed, false); // line up with red button
     } else {
-        drive(-7, speed); // back up to blue
+        drive(-9, speed); // back up to blue
         driveToPoint(17.6, 58.5, speed, false); // line up with blue button
     }
 
@@ -392,9 +395,10 @@ int main() {
 
         if (course == 'B') {
             correctHeading(293); // correct heading for course B
-            drive(0.2, speed); // move forward a little for B
+            drive(0.05, speed); // move forward a little for B
         } else {
             correctHeading(298); // correct heading for other courses
+            drive(-0.2, speed); // move back for every course but B
         }
 
         break;
@@ -403,11 +407,13 @@ int main() {
         correctHeading(285);
 
         if (course == 'B') {
-            drive(-0.3, speed); // move back a little for course B
+            drive(-0.5, speed); // move back a little for course B
         } else if (course == 'A') {
-            drive(-0.15, speed); // move back a little less for A
+            drive(-0.35, speed); // move back a little less for A
+        } else if (course == 'C'){
+            drive(-0.65, speed); // move back a little more for C
         } else {
-            drive(-0.45, speed); // move back a little more for C and D
+            drive(-0.65, speed); // move back a little more for D
         }
 
         break;
@@ -415,6 +421,7 @@ int main() {
     default:
         driveToPoint(5.1, 24, speed, false); // drive up to right lever
         correctHeading(269);
+        drive(-0.2, speed); // back up a little for all courses
         break;
     }
 
